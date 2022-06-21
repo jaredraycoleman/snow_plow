@@ -111,62 +111,56 @@ def find_pos_midpoint(f_fun: Expr,
         c = (c_low + c_high) / 2
         logging.debug(f'Iteration {iteration}: capacity {c}')
         
-        pos = np.zeros(num_agents+1)
+        left = [0]
+        right = [1]
         has_middle = False
         covered = False
-        j, k = num_agents - 1, num_agents
-        pos[j] = 0
-        pos[k] = 1
-        if cap(destination, pos[j]) <= c and cap(destination, pos[k]) <= c:
+        if cap(destination, left[-1]) <= c and cap(destination, right[-1]) <= c:
             logging.debug(f"c={c:0.4f} is feasible with just two robots")
             c_high = c
             continue
 
         for i in range(num_agents - 1)[::-1]:
-            logging.debug(f'{cap(destination, pos[k])}, {cap(destination, pos[j])}')
             logging.debug(f'Assigning Agent {i}')
-            if destination-pos[j] <= pos[k]-destination:
-                pos[i] = h(pos[k])
-                k = i
+            if destination-left[-1] <= right[-1]-destination:
+                right.append(h(right[-1]))
             else:
-                pos[i] = h(pos[j])
-                j = i
-            logging.debug(f'Assignments: {pos.round(2)}')
+                left.append(h(left[-1]))
+            logging.debug(f'Left: {left}')
+            logging.debug(f'Right: {right}')
             
-            if cap(destination, pos[k]) <= c and cap(destination, pos[j]) <= c:
+            if cap(destination, right[-1]) <= c and cap(destination, left[-1]) <= c:
                 covered = True
                 break
         
-        logging.debug(f'j={j}, k={k}')
         if not covered:
             logging.debug('even with extra robot, c is infeasible')
             c_low = c
-        elif min(j,k) >= 1:
+        elif len(left) + len(right) <= num_agents:
             logging.debug('did not need extra robot - c is feasible')
             c_high = c
         else:
             has_middle = True            
-            c1 = cap(pos[j], pos[k])
-            logging.debug(f"final interval: ({pos[j], pos[k]}), cap={c1}")
+            c1 = cap(left[-1], right[-1])
+            logging.debug(f"final interval: ({left[-1], right[-1]}), cap={c1}")
             if c1 < c:
                 c_high = c
             else:
                 c_low = c
 
+    pos = np.array(left + right[::-1])
     logging.debug(f'Middle Robot: {has_middle}')
     if has_middle:
-        pos = np.sort(pos)
         for i in range(1, len(pos)):
             logging.debug(f'Agent {i} Capacity: {cap(pos[i-1], pos[i]):0.4f}')
     else:
-        pos = np.sort(pos[1:])
         for i in range(len(pos)):
             if pos[i] < destination:
                 other = destination if pos[i+1] > destination else pos[i+1]
             else:
                 other = destination if pos[i-1] < destination else pos[i-1]
                 
-            logging.debug(f'Agent {i} Capacity: {cap(other, pos[i]):0.4f}')
+            logging.debug(f'Agent {i+1} Capacity: {cap(other, pos[i]):0.4f}')
 
     return pos 
 
@@ -226,7 +220,7 @@ def find_pos(distance: Callable[[Symbol], Expr],
 
 
 def main():
-    # logging.getLogger().setLevel(logging._nameToLevel['DEBUG'])
+    logging.getLogger().setLevel(logging._nameToLevel['DEBUG'])
     distance = lambda x: x**2
     accumulator = lambda x: x+1
     destination = 0.5
@@ -238,7 +232,7 @@ def main():
     pos = find_pos(
         distance=distance,
         accumulator=accumulator, # 1/(x-(1/2))**2- 4,
-        num_agents=60,
+        num_agents=6,
         epsilon=1e-10,
         destination=destination
     )
